@@ -15,6 +15,38 @@
 #include "ecmult_gen.h"
 #include "ecdsa.h"
 
+/* secp256k1 is the Curve used by Bitcoin
+	ec.secNamedCurves = {
+		// used by Bitcoin
+		"secp256k1": function () {
+			// p = 2^256 - 2^32 - 2^9 - 2^8 - 2^7 - 2^6 - 2^4 - 1
+			var p = ec.fromHex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F");
+			var a = BigInteger.ZERO;
+			var b = ec.fromHex("7");
+			var n = ec.fromHex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141");
+			var h = BigInteger.ONE;
+			var curve = new ec.CurveFp(p, a, b);
+			var G = curve.decodePointHex("04"
+					+ "79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798"
+					+ "483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8");
+			return new ec.X9Parameters(curve, G, n, h);
+		}
+		// used by Woodcoin
+		"secp256v1": function () {
+			// p = ???
+			var p = ec.fromHex("FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF");
+			var a = ec.fromHex("FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC");
+			var b = ec.fromHex("5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B");
+			var n = ec.fromHex("FFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551");
+			var h = BigInteger.ONE;
+			var curve = new ec.CurveFp(p, a, b);
+			var G = curve.decodePointHex("04"
+					+ "6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296"
+					+ "4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5");
+			return new ec.X9Parameters(curve, G, n, h);
+		}
+*/
+
 /** Group order for secp256k1 defined as 'n' in "Standards for Efficient Cryptography" (SEC2) 2.7.1
  *  sage: for t in xrange(1023, -1, -1):
  *     ..   p = 2**256 - 2**32 - t
@@ -29,8 +61,10 @@
  *   'fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141'
  */
 static const secp256k1_fe secp256k1_ecdsa_const_order_as_fe = SECP256K1_FE_CONST(
-    0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFEUL,
-    0xBAAEDCE6UL, 0xAF48A03BUL, 0xBFD25E8CUL, 0xD0364141UL
+   0xFFFFFFFFUL, 0x00000000UL, 0xFFFFFFFFUL, 0xFFFFFFFFUL,
+   0xBCE6FAADUL, 0xA7179E84UL, 0xF3B9CAC2UL, 0xFC632551UL
+	// 0xFFFFFFF0UL, 0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFEUL,
+   	// 0xBAAEDCE6UL, 0xAF48A03BUL, 0xBFD25E8CUL, 0xD0364141UL
 );
 
 /** Difference between field and order, values 'p' and 'n' values defined in
@@ -41,9 +75,22 @@ static const secp256k1_fe secp256k1_ecdsa_const_order_as_fe = SECP256K1_FE_CONST
  *  sage: F = FiniteField (p)
  *  sage: '%x' % (p - EllipticCurve ([F (a), F (b)]).order())
  *   '14551231950b75fc4402da1722fc9baee'
+sage: p=0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF
+sage: a=0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC
+sage: b=0x5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B
+sage: F=FiniteField(p)
+sage: '%x' % (p - EllipticCurve([F(a),F(b)]).order())
+  ***   Warning: increasing stack size to 2000000.
+  ***   Warning: increasing stack size to 4000000.
+  ***   Warning: increasing stack size to 8000000.
+  ***   Warning: increasing stack size to 16000000.
+'4319055358e8617b0c46353d039cdaae'
+
+
  */
 static const secp256k1_fe secp256k1_ecdsa_const_p_minus_order = SECP256K1_FE_CONST(
-    0, 0, 0, 1, 0x45512319UL, 0x50B75FC4UL, 0x402DA172UL, 0x2FC9BAEEUL
+    0, 0, 0, 0, 0x43190553UL, 0x58E8617BUL, 0x0C46353DUL, 0x039CDAAEUL
+   // 0, 0, 0, 1, 0x45512319UL, 0x50B75FC4UL, 0x402DA172UL, 0x2FC9BAEEUL
 );
 
 static int secp256k1_der_read_len(const unsigned char **sigp, const unsigned char *sigend) {

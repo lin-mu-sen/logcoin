@@ -167,7 +167,7 @@ public:
 };
 
 static std::unique_ptr<CCoinsViewErrorCatcher> pcoinscatcher;
-static std::unique_ptr<ECCVerifyHandle> globalVerifyHandle;
+//static std::unique_ptr<ECCVerifyHandle> globalVerifyHandle;
 
 static boost::thread_group threadGroup;
 static CScheduler scheduler;
@@ -290,8 +290,8 @@ void Shutdown()
     GetMainSignals().UnregisterBackgroundSignalScheduler();
     GetMainSignals().UnregisterWithMempoolSignals(mempool);
     g_wallet_init_interface.Close();
-    globalVerifyHandle.reset();
-    ECC_Stop();
+    //globalVerifyHandle.reset();
+    //ECC_Stop();
     LogPrintf("%s: done\n", __func__);
 }
 
@@ -715,10 +715,10 @@ static void ThreadImport(std::vector<fs::path> vImportFiles)
  */
 static bool InitSanityCheck(void)
 {
-    if(!ECC_InitSanityCheck()) {
+    /*if(!ECC_InitSanityCheck()) {
         InitError("Elliptic curve cryptography sanity check failure. Aborting.");
         return false;
-    }
+    }*/
 
     if (!glibc_sanity_test() || !glibcxx_sanity_test())
         return false;
@@ -1200,8 +1200,8 @@ bool AppInitSanityChecks()
     std::string sha256_algo = SHA256AutoDetect();
     LogPrintf("Using the '%s' SHA256 implementation\n", sha256_algo);
     RandomInit();
-    ECC_Start();
-    globalVerifyHandle.reset(new ECCVerifyHandle());
+    //ECC_Start();
+    //globalVerifyHandle.reset(new ECCVerifyHandle());
 
     // Sanity check
     if (!InitSanityCheck())

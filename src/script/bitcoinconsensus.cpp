@@ -64,10 +64,10 @@ inline int set_error(bitcoinconsensus_error* ret, bitcoinconsensus_error serror)
 
 struct ECCryptoClosure
 {
-    ECCVerifyHandle handle;
+    //ECCVerifyHandle handle;
 };
 
-ECCryptoClosure instance_of_eccryptoclosure;
+//ECCryptoClosure instance_of_eccryptoclosure;
 } // namespace
 
 /** Check that all specified flags are part of the libconsensus interface. */

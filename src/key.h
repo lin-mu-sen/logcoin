@@ -48,6 +48,8 @@ private:
     //! Whether the public key corresponding to this private key is (to be) compressed.
     bool fCompressed;
 
+    unsigned char vch[32];
+
     //! The actual byte data
     std::vector<unsigned char, secure_allocator<unsigned char> > keydata;
 
@@ -110,11 +112,8 @@ public:
      */
     CPubKey GetPubKey() const;
 
-    /**
-     * Create a DER-serialized signature.
-     * The test_case parameter tweaks the deterministic nonce.
-     */
-    bool Sign(const uint256& hash, std::vector<unsigned char>& vchSig, bool grind = true, uint32_t test_case = 0) const;
+    //! Create a DER-serialized signature.
+    bool Sign(const uint256& hash, std::vector<unsigned char>& vchSig, bool lowS = true) const;
 
     /**
      * Create a compact signature (65 bytes), which allows reconstructing the used public key.
@@ -127,7 +126,13 @@ public:
 
     //! Derive BIP32 child key.
     bool Derive(CKey& keyChild, ChainCode &ccChild, unsigned int nChild, const ChainCode& cc) const;
+   // bool Derive(CKey& keyChild, unsigned char ccChild[32], unsigned int nChild, const unsigned char cc[32]) const;
 
+    //! Load private key and check that public key matches.
+    bool Load(CPrivKey& privkey, CPubKey& vchPubKey, bool fSkipCheck);
+
+    //! Check whether an element of a signature (r or s) is valid.
+    static bool CheckSignatureElement(const unsigned char* vch, int len, bool half);
     /**
      * Verify thoroughly whether a private key and a public key match.
      * This is done using a different mechanism than just regenerating it.

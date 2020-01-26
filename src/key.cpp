@@ -3,7 +3,10 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <key.h>
+#include "key.h"
+#include <openssl/ecdsa.h>
+#include <openssl/rand.h>
+#include <openssl/obj_mac.h>
 
 #include <arith_uint256.h>
 #include <crypto/common.h>
@@ -11,13 +14,62 @@
 #include <random.h>
 #include <ecwrapper.h>
 
+//! anonymous namespace
+namespace {
 
-static secp256k1_context* secp256k1_context_sign = nullptr;
+int CompareBigEndian(const unsigned char *c1, size_t c1len, const unsigned char *c2, size_t c2len) {
+    while (c1len > c2len) {
+        if (*c1)
+            return 1;
+        c1++;
+        c1len--;
+    }
+    while (c2len > c1len) {
+        if (*c2)
+            return -1;
+        c2++;
+        c2len--;
+    }
+    while (c1len > 0) {
+        if (*c1 > *c2)
+            return 1;
+        if (*c2 > *c1)
+            return -1;
+        c1++;
+        c2++;
+        c1len--;
+    }
+    return 0;
+}
 
-/** These functions are taken from the libsecp256k1 distribution and are very ugly. */
+/** Order of secp256k1's generator minus 1. */
+const unsigned char vchMaxModOrder[32] = {
+    0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
+    0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFE,
+    0xBA,0xAE,0xDC,0xE6,0xAF,0x48,0xA0,0x3B,
+    0xBF,0xD2,0x5E,0x8C,0xD0,0x36,0x41,0x40
+};
+
+/** Half of the order of secp256k1's generator minus 1. */
+const unsigned char vchMaxModHalfOrder[32] = {
+    0x7F,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
+    0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
+    0x5D,0x57,0x6E,0x73,0x57,0xA4,0x50,0x1D,
+    0xDF,0xE9,0x2F,0x46,0x68,0x1B,0x20,0xA0
+};
+
+const unsigned char vchZero[1] = {0};
+
+} // anon namespace
 
 bool CKey::Check(const unsigned char *vch) {
-    return secp256k1_ec_seckey_verify(secp256k1_context_sign, vch);
+    return CompareBigEndian(vch, 32, vchZero, 0) > 0 &&
+           CompareBigEndian(vch, 32, vchMaxModOrder, 32) <= 0;
+}
+
+bool CKey::CheckSignatureElement(const unsigned char *vch, int len, bool half) {
+    return CompareBigEndian(vch, len, vchZero, 0) > 0 &&
+           CompareBigEndian(vch, len, half ? vchMaxModHalfOrder : vchMaxModOrder, 32) <= 0;
 }
 
 void CKey::MakeNewKey(bool fCompressedIn) {
@@ -159,11 +211,34 @@ bool CKey::Derive(CKey& keyChild, ChainCode &ccChild, unsigned int nChild, const
     }
     memcpy(ccChild.begin(), vout.data()+32, 32);
     memcpy((unsigned char*)keyChild.begin(), begin(), 32);
-    bool ret = secp256k1_ec_privkey_tweak_add(secp256k1_context_sign, (unsigned char*)keyChild.begin(), vout.data());
+    bool ret = CECKey::TweakSecret((unsigned char*)keyChild.begin(), begin(), vout.data());
     keyChild.fCompressed = true;
     keyChild.fValid = ret;
     return ret;
 }
+
+/*
+bool CKey::Derive(CKey& keyChild, unsigned char ccChild[32], unsigned int nChild, const unsigned char cc[32]) const {
+    assert(IsValid());
+    assert(IsCompressed());
+    unsigned char out[64];
+    //LockObject(out);
+    if ((nChild >> 31) == 0) {
+        CPubKey pubkey = GetPubKey();
+        assert(pubkey.begin() + 33 == pubkey.end());
+        BIP32Hash(cc, nChild, *pubkey.begin(), pubkey.begin()+1, out);
+    } else {
+        assert(begin() + 32 == end());
+        BIP32Hash(cc, nChild, 0, begin(), out);
+    }
+    memcpy(ccChild, out+32, 32);
+    bool ret = CECKey::TweakSecret((unsigned char*)keyChild.begin(), begin(), out);
+    //UnlockObject(out);
+    keyChild.fCompressed = true;
+    keyChild.fValid = ret;
+    return ret;
+}
+*/
 
 bool CExtKey::Derive(CExtKey &out, unsigned int _nChild) const {
     out.nDepth = nDepth + 1;
@@ -172,6 +247,7 @@ bool CExtKey::Derive(CExtKey &out, unsigned int _nChild) const {
     out.nChild = _nChild;
     return key.Derive(out.key, out.chaincode, _nChild, chaincode);
 }
+
 
 void CExtKey::SetSeed(const unsigned char *seed, unsigned int nSeedLen) {
     static const unsigned char hashkey[] = {'B','i','t','c','o','i','n',' ','s','e','e','d'};
@@ -220,6 +296,7 @@ bool ECC_InitSanityCheck() {
     return key.VerifyPubKey(pubkey);
 }
 
+/* 
 void ECC_Start() {
     assert(secp256k1_context_sign == nullptr);
 
@@ -245,3 +322,4 @@ void ECC_Stop() {
         secp256k1_context_destroy(ctx);
     }
 }
+*/

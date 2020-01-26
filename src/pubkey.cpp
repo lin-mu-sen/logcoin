@@ -222,6 +222,35 @@ bool CPubKey::Decompress() {
     return true;
 }
 
+bool CPubKey::Derive(CKey& keyChild, ChainCode &ccChild, unsigned int nChild, const ChainCode& cc) const {
+    assert(IsValid());
+    assert(IsCompressed());
+    std::vector<unsigned char, secure_allocator<unsigned char>> vout(64);
+    if ((nChild >> 31) == 0) {
+        CPubKey pubkey = GetPubKey();
+        assert(pubkey.size() == CPubKey::COMPRESSED_PUBLIC_KEY_SIZE);
+        BIP32Hash(cc, nChild, *pubkey.begin(), pubkey.begin()+1, vout.data());
+    } else {
+        assert(size() == 32);
+        BIP32Hash(cc, nChild, 0, begin(), vout.data());
+    }
+    memcpy(ccChild.begin(), vout.data()+32, 32);
+    memcpy((unsigned char*)keyChild.begin(), begin(), 32);
+
+
+    CECKey key;
+    bool ret = key.SetPubKey(begin(), size());
+    //bool ret = secp256k1_ec_privkey_tweak_add(secp256k1_context_sign, (unsigned char*)keyChild.begin(), vout.data());
+    ret &= key.TweakPublic(vout.data());
+    std::vector<unsigned char> pubkey;
+    key.GetPubKey(pubkey, true);
+    pubkeyChild.Set(pubkey.begin(), pubkey.end());
+    
+    keyChild.fCompressed = true;
+    keyChild.fValid = ret;
+    return ret;
+}
+/*
 bool CPubKey::Derive(CPubKey& pubkeyChild, ChainCode &ccChild, unsigned int nChild, const ChainCode& cc) const {
     assert(IsValid());
     assert((nChild >> 31) == 0);
@@ -241,7 +270,7 @@ bool CPubKey::Derive(CPubKey& pubkeyChild, ChainCode &ccChild, unsigned int nChi
     secp256k1_ec_pubkey_serialize(secp256k1_context_verify, pub, &publen, &pubkey, SECP256K1_EC_COMPRESSED);
     pubkeyChild.Set(pub, pub + publen);
     return true;
-}
+}*/
 
 void CExtPubKey::Encode(unsigned char code[BIP32_EXTKEY_SIZE]) const {
     code[0] = nDepth;
@@ -277,7 +306,9 @@ bool CExtPubKey::Derive(CExtPubKey &out, unsigned int _nChild) const {
     return (!secp256k1_ecdsa_signature_normalize(secp256k1_context_verify, nullptr, &sig));
 }
 
-/* static */ int ECCVerifyHandle::refcount = 0;
+/* static */ 
+/*
+int ECCVerifyHandle::refcount = 0;
 
 ECCVerifyHandle::ECCVerifyHandle()
 {
@@ -297,4 +328,4 @@ ECCVerifyHandle::~ECCVerifyHandle()
         secp256k1_context_destroy(secp256k1_context_verify);
         secp256k1_context_verify = nullptr;
     }
-}
+}*/
